@@ -76,7 +76,7 @@ class Game:
         if self.time < 0:
             return Status.DNF, "Timed Out"
         self.time += min(time_taken, self.delay)
-        options = {(1, 0), (-1, 0), (0, 1), (0, -1), (0, 0)}
+        options = {(1, 0), (-1, 0), (0, 1), (0, -1)}
         if action not in options:
             return Status.DNF, f"Racer made illegal move {action}!"
         if self.track.buttons[self.pos]:
