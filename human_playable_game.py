@@ -11,7 +11,7 @@ from game_world.racetrack import RaceTrack, load_track
 from random_bot import random_move
 import traceback
 
-TRACK = load_track("./tracks/rooms.pkl")
+TRACK = load_track("tracks/bbbmaze.pkl")
 PLAYER = random_move
 REPLAY_SPEED = 0.05  # seconds per move in the replay. (lower is faster)
 SHOW_REPLAY = True
@@ -151,7 +151,7 @@ def play_visible(track: RaceTrack, time_per_move: float):
                 status, msg, track_surface = game.tick()
                 most_recent_arrow.clear()
             if status != Status.ONGOING:
-                print(msg)
+                print(msg) # type: ignore
                 done = True
             move_start, move_end = move_end, game.pos
             p = 0

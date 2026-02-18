@@ -11,9 +11,9 @@ from game_world.racetrack import RaceTrack, load_track
 from best_bot import best_bot
 import traceback
 
-TRACK = load_track("./tracks/extreme.pkl")
+TRACK = load_track("./tracks/bbbmaze.pkl")
 PLAYER = best_bot()
-REPLAY_SPEED = .05  # seconds per move in the replay. (lower is faster)
+REPLAY_SPEED = 0.2  # seconds per move in the replay. (lower is faster)
 SHOW_REPLAY = True
 CLOCK = 10
 DELAY = 5

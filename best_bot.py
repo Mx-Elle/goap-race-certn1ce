@@ -15,7 +15,7 @@ class best_bot:
     """
 
     def __init__(self) -> None:
-        self.map_target: Point | None = None
+        self.first_run: bool = True
         self.current_path: deque[Point] = deque()
 
     def __call__(self, location: Point, map: RaceTrack) -> Point:
@@ -23,11 +23,17 @@ class best_bot:
 
 
     def dist(self, p1: Point, p2: Point) -> int:
+        """
+        manhattan distance between points
+        
+        :return: absolute value distance
+        :rtype: int
+        """
         return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
 
     def getVector(self, a: Point, b: Point) -> tuple[int, int]:
         """
-        takes points a and b, returns vector from a to b
+        vector between points ab
 
         :return: vector ab
         :rtype: tuple[int, int]
@@ -36,6 +42,13 @@ class best_bot:
         return (b[0] - a[0], b[1] - a[1])
 
     def searialize(self, map: RaceTrack) -> bytes:
+        """
+        hashable active array from map\n
+        useful for comparing game states
+        
+        :return: bytes of active array
+        :rtype: bytes
+        """
         return map.active.tobytes()
 
     def tvrs_neighbors(
@@ -44,7 +57,7 @@ class best_bot:
         map: RaceTrack,
     ) -> set[Point]:
         """
-        Takes a cell as input and returns its traversable neighbors
+        takes a cell as input and returns its traversable neighbors
 
         :return: set of neighbors, up to 4
         :rtype: set[Point]
@@ -59,10 +72,18 @@ class best_bot:
                 neighbors.add(new_cell)
         return neighbors
 
-    def simulate_move(self, move: Point, map: RaceTrack) -> RaceTrack:
-        # move is location after move, not vector
-        if move in map.find_buttons():
-            color = map.button_colors[move]
+    def simulate_move(self, cell: Point, map: RaceTrack) -> RaceTrack:
+        """
+        returns map after a simulated move to cell on the map passed as argument
+        \nif a button is located at cell, a new map is returned
+        \notherwise the same map is returned
+        
+        :return: map after move
+        :rtype: RaceTrack
+        """
+        # cell is location after move, not vector
+        if cell in map.find_buttons():
+            color = map.button_colors[cell]
             new_map = deepcopy(map)
             new_map.toggle(color)
             return new_map
@@ -78,8 +99,7 @@ class best_bot:
         """
         finds shortest path between two points on the map
 
-        :type buttonless: bool
-        :return: sequence of cells from starting point to ending point
+        :return: sequence of cells from starting point to target
         :rtype: list[Point]
         """
 
@@ -96,7 +116,13 @@ class best_bot:
         camefrom[(starting_point, s_map_bytes)] = (None, None)
         g_scores[(starting_point, s_map_bytes)] = 0
         frontier.append(
-            (self.dist(starting_point, target), 0, starting_point, tiebreaker, starting_map)
+            (
+                self.dist(starting_point, target),
+                0,
+                starting_point,
+                tiebreaker,
+                starting_map
+            )
         )
 
         # expand frontier until all cells explored or shortest path found
@@ -106,7 +132,7 @@ class best_bot:
                 current_f,
                 current_g,
                 current_position,
-                _,
+                _, # unpack tiebreaker but never use it
                 current_map
             ) = heapq.heappop(frontier)
 
@@ -122,8 +148,12 @@ class best_bot:
                     (loc, n_map_bytes) not in camefrom or
                     current_g + 1 < g_scores[(loc, n_map_bytes)]
                 ):
-                    camefrom[(loc, n_map_bytes)] = (current_position, c_map_bytes)
+                    camefrom[(loc, n_map_bytes)] = (
+                        current_position,
+                        c_map_bytes
+                    )
                     g_scores[(loc, n_map_bytes)] = current_g + 1
+                    tiebreaker += 1
                     heapq.heappush(
                         frontier,
                         (
@@ -134,36 +164,56 @@ class best_bot:
                             new_map,
                         ),
                     )
-                    tiebreaker += 1
 
         # return empty path if no possible path to target
-        # use end_state instead of a found flag to avoid linter error
         if end_state == None:
             return deque()
 
         # creating path
         current_position = target
-        current_map = end_state  # current_map is now a serialized map not map object
-        while (current_position, current_map) != (None, None):
+        c_map_bytes = end_state
+        while (current_position, c_map_bytes) != (None, None):
             path.appendleft(current_position)
             (
-                current_position, current_map
-            ) = camefrom[(current_position, current_map)]
+                current_position, c_map_bytes
+            ) = camefrom[(current_position, c_map_bytes)]
+        # pop the start cell because we are already there
         path.popleft()
         return path
 
     def best_move(self, location: Point, map: RaceTrack) -> Point:
+        """
+        return optimal move
+        
+        :return: orthogonal unit vector from current cell to next cell
+        :rtype: Point
+        """
         # on first move
-        if self.map_target == None:
-            self.map_target = map.target
-
+        if self.first_run:
             self.current_path = self.astar(
                 location,
-                self.map_target,
+                map.target,
                 map,
             )
+            self.first_run = False
 
-        if len(self.current_path) > 0:
-            return self.getVector(location, self.current_path.popleft())
+        if self.current_path:
+            vector = self.getVector(location, self.current_path.popleft())
+            if vector != (0, 0):
+                return vector
+            else:
+                raise BotWontMoveError("next move is (0, 0)")
         else:
-            raise ZeroDivisionError("no move")
+            raise BotWontMoveError("no path found for bot to follow")
+
+
+class BotWontMoveError(Exception):
+    """
+    Exception raised when bot will not make a legal move
+    """
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        return self.message
